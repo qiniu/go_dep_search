@@ -12,12 +12,16 @@ go get -u github.com/ma6174/go_dep_search
 
 ```
 go list -json ./... | go_dep_search package_names
+
+Args:
+  -main
+    	only show main package
 ```
 
-eg: find which command(main package) use `net/http` and `encoding/json` package in go source code:
+eg: find which command(main package) use `net/http` or `encoding/json` package in go source code:
 
 ```bash
-~/go/src(!go1.12.5!)$ go list -json ./... | go_dep_search -main net/http encoding/json
+~/go/src(go1.12.5)$ go list -json ./... | go_dep_search -main net/http encoding/json
 Name	->	ImportPath	->	dep_package
 main	->	cmd/compile	->	encoding/json
 main	->	cmd/cover	->	encoding/json
