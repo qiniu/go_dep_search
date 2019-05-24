@@ -1,71 +1,77 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
+	"log"
 	"os"
-	"sync"
+	"path"
+	"strings"
+
+	"github.com/ma6174/go_dep_search/depgraph"
 )
 
 const usage = `Usage:
 
-go list -json ./... | %s package_names
+go list -json all | %s package_names
 
 Args:
 `
 
-type DepInfo struct {
-	ImportPath string   `json:"ImportPath"`
-	Name       string   `json:"Name"`
-	Deps       []string `json:"Deps"`
-}
-
-func (d DepInfo) HasDep(packageName string) bool {
-	for _, v := range d.Deps {
-		if v == packageName {
-			return true
-		}
-	}
-	return false
-}
-
 func main() {
 	onlyMain := flag.Bool("main", false, "only show main package")
+	chain := flag.Bool("chain", false, "show dep chained")
+	unused := flag.Bool("unused", false, "list unused packages")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, usage, os.Args[0])
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-	if flag.NArg() == 0 {
+	if flag.NArg() == 0 && !*unused {
 		flag.Usage()
 		return
 	}
-	dec := json.NewDecoder(os.Stdin)
-	var once sync.Once
-	for {
-		var di DepInfo
-		err := dec.Decode(&di)
-		if err != nil {
-			if err == io.EOF {
-				break
+	if *chain {
+		*onlyMain = true
+	}
+	dg, err := depgraph.LoadDeps(os.Stdin)
+	if err != nil {
+		log.Fatalln("LoadDeps failed", err)
+	}
+	log.Printf("successfuly load %d packages (%d main packages)", dg.CountAll(), dg.CountMain())
+	if *unused {
+		log.Println("unused packages:")
+		fmt.Println(strings.Join(dg.ListUnUsed(), "\n"))
+	}
+	for _, dep := range flag.Args() {
+		if *chain {
+			chains := dg.SearchChain(dep)
+			if len(chains) == 0 {
+				log.Printf("%v not found", dep)
 			}
-			panic(err)
-		}
-		if *onlyMain && di.Name != "main" {
-			continue
-		}
-		for _, dep := range flag.Args() {
-			if di.HasDep(dep) {
-				once.Do(func() {
-					fmt.Fprintln(os.Stderr, "Name\t->\tImportPath\t->\tdep_package")
-				})
-				fmt.Printf("%s\t->\t%s\t->\t%s\n", di.Name, di.ImportPath, dep)
+			for _, chain := range chains {
+				fmt.Println(strings.Join(chain, " -> "))
+			}
+		} else if *onlyMain {
+			packages := dg.SearchMain(dep)
+			if len(packages) == 0 {
+				log.Printf("%v not found", dep)
+			}
+			for _, p := range packages {
+				fmt.Println(strings.Join([]string{"main", p, dep}, " -> "))
+			}
+		} else {
+			packages := dg.SearchAll(dep)
+			if len(packages) == 0 {
+				log.Printf("%v not found", dep)
+			}
+			for _, p := range packages {
+				name := "main"
+				if !dg.IsMainPackage(p) {
+					name = path.Base(p)
+				}
+				fmt.Println(strings.Join([]string{name, p, dep}, " -> "))
 			}
 		}
 	}
-	once.Do(func() {
-		fmt.Fprintf(os.Stderr, "package not found: %v\n", flag.Args())
-	})
 }
