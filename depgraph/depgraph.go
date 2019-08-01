@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"sort"
+	"strings"
 )
 
 type DepInfo struct {
@@ -33,6 +34,7 @@ type DepGraph struct {
 	imports      map[string]map[string]bool
 	allDeps      map[string]map[string]bool
 	mainPackages map[string]bool
+	testPackages map[string]bool
 }
 
 func (g *DepGraph) Add(d DepInfo) {
@@ -43,11 +45,22 @@ func (g *DepGraph) Add(d DepInfo) {
 	if g.mainPackages == nil {
 		g.mainPackages = make(map[string]bool)
 	}
+	if g.testPackages == nil {
+		g.testPackages = make(map[string]bool)
+	}
 	if g.allDeps == nil {
 		g.allDeps = make(map[string]map[string]bool)
 	}
+	if strings.HasSuffix(d.ImportPath, "]") { // skip test package
+		return
+	}
+	isTestPackage := strings.HasSuffix(d.ImportPath, ".test")
 	if d.Name == "main" {
-		g.mainPackages[d.ImportPath] = true
+		if isTestPackage {
+			g.testPackages[d.ImportPath] = true
+		} else {
+			g.mainPackages[d.ImportPath] = true
+		}
 	}
 	g.imports[d.ImportPath] = d.ImportsMap()
 	g.allDeps[d.ImportPath] = d.DepsMap()
@@ -58,6 +71,10 @@ func (g *DepGraph) CountAll() int {
 }
 func (g *DepGraph) CountMain() int {
 	return len(g.mainPackages)
+}
+
+func (g *DepGraph) CountTest() int {
+	return len(g.testPackages)
 }
 
 func reverseSlice(a []string) {
@@ -71,6 +88,15 @@ func reverseSlice(a []string) {
 
 func (g *DepGraph) SearchMain(packageName string) (packages []string) {
 	for v := range g.mainPackages {
+		if g.allDeps[v][packageName] {
+			packages = append(packages, v)
+		}
+	}
+	return
+}
+
+func (g *DepGraph) SearchTest(packageName string) (packages []string) {
+	for v := range g.testPackages {
 		if g.allDeps[v][packageName] {
 			packages = append(packages, v)
 		}
@@ -92,7 +118,7 @@ func (g *DepGraph) ListUnUsed() (packages []string) {
 		sort.Strings(packages)
 	}()
 	for p := range g.allDeps {
-		if g.mainPackages[p] {
+		if g.mainPackages[p] || g.testPackages[p] {
 			continue
 		}
 		found := false
@@ -112,10 +138,15 @@ func (g *DepGraph) IsMainPackage(packageName string) bool {
 	return g.mainPackages[packageName]
 }
 
+func (g *DepGraph) IsTestPackage(packageName string) bool {
+	return g.testPackages[packageName]
+}
+
 func (g *DepGraph) SearchChain(packageName string) (chains [][]string) {
 	for _, p := range g.SearchMain(packageName) {
 		chain := []string{}
-		chain, found := g.search(p, packageName, chain)
+		checked := make(map[string]bool)
+		chain, found := g.search(p, packageName, chain, checked)
 		if !found {
 			// dep存在，但是找不到依赖链，说明依赖关系导入不全，比如缺少标准库
 			chain = []string{packageName, "..."}
@@ -128,14 +159,18 @@ func (g *DepGraph) SearchChain(packageName string) (chains [][]string) {
 	return
 }
 
-func (g *DepGraph) search(start, packageName string, current []string) (after []string, found bool) {
+func (g *DepGraph) search(start, packageName string, current []string, checked map[string]bool) (after []string, found bool) {
+	if checked[start] {
+		return
+	}
+	checked[start] = true
 	if g.imports[start][packageName] {
 		found = true
 		after = append(current, packageName)
 		return
 	}
 	for p := range g.imports[start] {
-		if after, ok := g.search(p, packageName, current); ok {
+		if after, ok := g.search(p, packageName, current, checked); ok {
 			after = append(after, p)
 			return after, true
 		}

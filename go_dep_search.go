@@ -20,6 +20,7 @@ Args:
 
 func main() {
 	onlyMain := flag.Bool("main", false, "only show main package")
+	onlyTest := flag.Bool("test", false, "only show test package")
 	chain := flag.Bool("chain", false, "show dep chained")
 	unused := flag.Bool("unused", false, "list unused packages")
 	flag.Usage = func() {
@@ -38,7 +39,8 @@ func main() {
 	if err != nil {
 		log.Fatalln("LoadDeps failed", err)
 	}
-	log.Printf("successfuly load %d packages (%d main packages)", dg.CountAll(), dg.CountMain())
+	log.Printf("successfuly load %d packages (%d main packages, %d test packages)",
+		dg.CountAll(), dg.CountMain(), dg.CountTest())
 	if *unused {
 		log.Println("unused packages:")
 		fmt.Println(strings.Join(dg.ListUnUsed(), "\n"))
@@ -60,15 +62,27 @@ func main() {
 			for _, p := range packages {
 				fmt.Println(strings.Join([]string{"main", p, dep}, " -> "))
 			}
+		} else if *onlyTest {
+			packages := dg.SearchTest(dep)
+			if len(packages) == 0 {
+				log.Printf("%v not found", dep)
+			}
+			for _, p := range packages {
+				p = strings.TrimSuffix(p, ".test")
+				fmt.Println(strings.Join([]string{"test", p, dep}, " -> "))
+			}
 		} else {
 			packages := dg.SearchAll(dep)
 			if len(packages) == 0 {
 				log.Printf("%v not found", dep)
 			}
 			for _, p := range packages {
-				name := "main"
-				if !dg.IsMainPackage(p) {
-					name = path.Base(p)
+				name := path.Base(p)
+				if dg.IsMainPackage(p) {
+					name = "main"
+				} else if dg.IsTestPackage(p) {
+					name = "test"
+					p = strings.TrimSuffix(p, ".test")
 				}
 				fmt.Println(strings.Join([]string{name, p, dep}, " -> "))
 			}

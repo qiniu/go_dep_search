@@ -11,7 +11,7 @@ go get -u github.com/ma6174/go_dep_search
 ### Usage
 
 ```
-go list -json all | go_dep_search package_names
+go list -json -deps -test all | go_dep_search package_names
 
 Args:
   -chain
