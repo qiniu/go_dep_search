@@ -14,6 +14,12 @@ func TestDepGraph(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+	if !dg.Exists("fmt") {
+		t.Error("fmt should exists")
+	}
+	if dg.Exists("fmtxxxxxxx") {
+		t.Error("fmtxxxxxxx should not exists")
+	}
 	mains := map[string]bool{
 		"cmd/vet": true,
 		"fmt":     false,

@@ -72,6 +72,9 @@ func main() {
 				fmt.Println(strings.Join([]string{"test", p, dep}, " -> "))
 			}
 		} else {
+			if dg.Exists(dep) {
+				fmt.Println(strings.Join([]string{"[self]", dep}, " -> "))
+			}
 			packages := dg.SearchAll(dep)
 			if len(packages) == 0 {
 				log.Printf("%v not found", dep)
@@ -79,9 +82,9 @@ func main() {
 			for _, p := range packages {
 				name := path.Base(p)
 				if dg.IsMainPackage(p) {
-					name = "main"
+					name = "[main]"
 				} else if dg.IsTestPackage(p) {
-					name = "test"
+					name = "[test]"
 					p = strings.TrimSuffix(p, ".test")
 				}
 				fmt.Println(strings.Join([]string{name, p, dep}, " -> "))

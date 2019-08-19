@@ -104,6 +104,11 @@ func (g *DepGraph) SearchTest(packageName string) (packages []string) {
 	return
 }
 
+func (g *DepGraph) Exists(packageName string) bool {
+	_, exists := g.allDeps[packageName]
+	return exists
+}
+
 func (g *DepGraph) SearchAll(packageName string) (packages []string) {
 	for k, v := range g.allDeps {
 		if v[packageName] {
