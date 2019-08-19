@@ -76,7 +76,7 @@ func main() {
 				fmt.Println(strings.Join([]string{"[self]", dep}, " -> "))
 			}
 			packages := dg.SearchAll(dep)
-			if len(packages) == 0 {
+			if len(packages) == 0 && !dg.Exists(dep) {
 				log.Printf("%v not found", dep)
 			}
 			for _, p := range packages {
