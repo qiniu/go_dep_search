@@ -92,6 +92,9 @@ func (g *DepGraph) SearchMain(packageName string) (packages []string) {
 			packages = append(packages, v)
 		}
 	}
+	if g.Exists(packageName) {
+		packages = append(packages, packageName)
+	}
 	return
 }
 
