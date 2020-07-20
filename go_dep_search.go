@@ -60,7 +60,11 @@ func main() {
 				log.Printf("%v not found", dep)
 			}
 			for _, p := range packages {
-				fmt.Println(strings.Join([]string{"main", p, dep}, " -> "))
+				deps := []string{"main", p}
+				if p != dep {
+					deps = append(deps, dep)
+				}
+				fmt.Println(strings.Join(deps, " -> "))
 			}
 		} else if *onlyTest {
 			packages := dg.SearchTest(dep)

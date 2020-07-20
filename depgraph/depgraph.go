@@ -88,7 +88,7 @@ func reverseSlice(a []string) {
 
 func (g *DepGraph) SearchMain(packageName string) (packages []string) {
 	for v := range g.mainPackages {
-		if g.allDeps[v][packageName] {
+		if g.allDeps[v][packageName] || v == packageName {
 			packages = append(packages, v)
 		}
 	}
@@ -149,6 +149,10 @@ func (g *DepGraph) IsTestPackage(packageName string) bool {
 
 func (g *DepGraph) SearchChain(packageName string) (chains [][]string) {
 	for _, p := range g.SearchMain(packageName) {
+		if p == packageName {
+			chains = append(chains, []string{"main", p})
+			continue
+		}
 		chain := []string{}
 		checked := make(map[string]bool)
 		chain, found := g.search(p, packageName, chain, checked)
