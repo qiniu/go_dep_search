@@ -43,6 +43,23 @@ func TestDepGraph(t *testing.T) {
 			}
 		}
 	}
+	// SearchChain with main package
+	chains = dg.SearchChain("cmd/vet")
+	if len(chains) != 1 {
+		t.Error("not found")
+	}
+	if chains[0][0] != "main" || chains[0][1] != "cmd/vet" {
+		t.Error("should be main -> cmd/vet")
+	}
+	// SearchMain with main package
+	ms := dg.SearchMain("cmd/vet")
+	if len(ms) != 1 {
+		t.Error("not found")
+	}
+	if ms[0] != "cmd/vet" {
+		t.Error("should be cmd/vet")
+	}
+
 	if dg.CountAll() != 371 || dg.CountMain() != 20 {
 		t.Error(dg.CountAll(), dg.CountMain())
 	}
