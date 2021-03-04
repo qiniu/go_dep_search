@@ -39,7 +39,7 @@ func main() {
 	if err != nil {
 		log.Fatalln("LoadDeps failed", err)
 	}
-	log.Printf("successfuly load %d packages (%d main packages, %d test packages)",
+	log.Printf("successfully load %d packages (%d main packages, %d test packages)",
 		dg.CountAll(), dg.CountMain(), dg.CountTest())
 	if *unused {
 		log.Println("unused packages:")
