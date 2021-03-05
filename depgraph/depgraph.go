@@ -154,8 +154,7 @@ func (g *DepGraph) SearchChain(packageName string) (chains [][]string) {
 			continue
 		}
 		chain := []string{}
-		checked := make(map[string]bool)
-		chain, found := g.search(p, packageName, chain, checked)
+		chain, found := g.search(p, packageName, chain)
 		if !found {
 			// dep存在，但是找不到依赖链，说明依赖关系导入不全，比如缺少标准库
 			chain = []string{packageName, "..."}
@@ -168,18 +167,17 @@ func (g *DepGraph) SearchChain(packageName string) (chains [][]string) {
 	return
 }
 
-func (g *DepGraph) search(start, packageName string, current []string, checked map[string]bool) (after []string, found bool) {
-	if checked[start] {
+func (g *DepGraph) search(start, packageName string, current []string) (after []string, found bool) {
+	if !g.allDeps[start][packageName] {
 		return
 	}
-	checked[start] = true
 	if g.imports[start][packageName] {
 		found = true
 		after = append(current, packageName)
 		return
 	}
 	for p := range g.imports[start] {
-		if after, ok := g.search(p, packageName, current, checked); ok {
+		if after, ok := g.search(p, packageName, current); ok {
 			after = append(after, p)
 			return after, true
 		}
