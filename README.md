@@ -58,6 +58,17 @@ main -> cmd/trace -> encoding/json
 main -> cmd/vet -> cmd/vendor/golang.org/x/tools/go/analysis/unitchecker -> encoding/json
 ```
 
+eg: show dep graph from net/http to net
+
+
+```
+root@b7e158d83ff2:/go# go list -json all | go_dep_search -graph -o net.jpg net/http net
+
+result saved to net.jpg
+```
+
+![net.jpg](./depgraph/testdata/net.jpg)
+
 eg: show unsed packages
 
 ```

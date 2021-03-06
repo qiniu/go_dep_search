@@ -6,7 +6,7 @@ import (
 )
 
 func TestDepGraph(t *testing.T) {
-	f, err := os.Open("../testdata/go1.12.5_deps.json")
+	f, err := os.Open("testdata/go1.12.5_deps.json")
 	if err != nil {
 		panic(err)
 	}
@@ -41,6 +41,25 @@ func TestDepGraph(t *testing.T) {
 			if v == "..." {
 				t.Error("should not contains ...")
 			}
+		}
+	}
+	// SearchGraph
+	result := dg.SearchGraph("net/http", "net")
+	if len(result) != 8 {
+		t.Error("expect 8, real:", len(result))
+	}
+	if len(result["net/http"]) != 7 {
+		t.Error("expect 7, real:", len(result["net/http"]))
+	}
+	if len(result["net"]) != 0 {
+		t.Error("expect 0, real:", len(result["net"]))
+	}
+	for _, rr := range result["net/http"] {
+		if rr == "net" {
+			continue
+		}
+		if len(result[rr]) <= 0 {
+			t.Error("result error", result)
 		}
 	}
 	// SearchChain with main package

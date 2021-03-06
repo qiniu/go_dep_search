@@ -1,6 +1,7 @@
 package depgraph
 
 import (
+	"container/list"
 	"encoding/json"
 	"io"
 	"sort"
@@ -8,10 +9,10 @@ import (
 )
 
 type DepInfo struct {
-	ImportPath string   `json:"ImportPath"`
-	Name       string   `json:"Name"`
-	Deps       []string `json:"Deps"`
-	Imports    []string `json:"Imports"`
+	ImportPath string   `json:"ImportPath"` // import path of package in dir
+	Name       string   `json:"Name"`       // package name
+	Deps       []string `json:"Deps"`       // all (recursively) imported dependencies
+	Imports    []string `json:"Imports"`    // import paths used by this package
 }
 
 func (d *DepInfo) ImportsMap() map[string]bool {
@@ -180,6 +181,34 @@ func (g *DepGraph) search(start, packageName string, current []string) (after []
 		if after, ok := g.search(p, packageName, current); ok {
 			after = append(after, p)
 			return after, true
+		}
+	}
+	return
+}
+
+func (g *DepGraph) SearchGraph(start, toSearch string) (result map[string][]string) {
+	if !g.allDeps[start][toSearch] {
+		return
+	}
+	result = make(map[string][]string)
+	checked := make(map[string]bool)
+	l := list.New()
+	l.PushBack(start)
+	checked[start] = true
+	for e := l.Front(); e != nil; e = e.Next() {
+		fromPackage := e.Value.(string)
+		for p := range g.imports[fromPackage] {
+			if p == toSearch {
+				result[fromPackage] = append(result[fromPackage], p)
+				continue
+			}
+			if g.allDeps[p][toSearch] {
+				if !checked[p] {
+					checked[p] = true
+					l.PushBack(p)
+				}
+				result[fromPackage] = append(result[fromPackage], p)
+			}
 		}
 	}
 	return

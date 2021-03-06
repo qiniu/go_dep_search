@@ -6,8 +6,11 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
+	"github.com/goccy/go-graphviz"
+	"github.com/goccy/go-graphviz/cgraph"
 	"github.com/ma6174/go_dep_search/depgraph"
 )
 
@@ -18,11 +21,16 @@ go list -json all | %s package_names
 Args:
 `
 
+var (
+	onlyMain        = flag.Bool("main", false, "only show main package")
+	onlyTest        = flag.Bool("test", false, "only show test package")
+	chain           = flag.Bool("chain", false, "show dep chain, eg: main->package_a->b->c->d")
+	unused          = flag.Bool("unused", false, "list unused packages")
+	graph           = flag.Bool("graph", false, "show dep graph: -graph <from_package> <to_package>")
+	graphResultFile = flag.String("o", "/tmp/dep.svg", "used with -graph, result file path, supported type: svg,png,jpg,dot")
+)
+
 func main() {
-	onlyMain := flag.Bool("main", false, "only show main package")
-	onlyTest := flag.Bool("test", false, "only show test package")
-	chain := flag.Bool("chain", false, "show dep chained")
-	unused := flag.Bool("unused", false, "list unused packages")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, usage, os.Args[0])
 		flag.PrintDefaults()
@@ -44,6 +52,12 @@ func main() {
 	if *unused {
 		log.Println("unused packages:")
 		fmt.Println(strings.Join(dg.ListUnUsed(), "\n"))
+		return
+	}
+	if *graph {
+		result := dg.SearchGraph(flag.Arg(0), flag.Arg(1))
+		resultToSvg(result)
+		return
 	}
 	for _, dep := range flag.Args() {
 		if *chain {
@@ -95,4 +109,41 @@ func main() {
 			}
 		}
 	}
+}
+
+func resultToSvg(result map[string][]string) {
+	g := graphviz.New()
+	defer g.Close()
+	graph, err := g.Graph()
+	if err != nil {
+		log.Panicln(err)
+	}
+	defer graph.Close()
+	graph.SetRankDir(cgraph.LRRank)
+	for from, tos := range result {
+		fromNode, err := graph.CreateNode(from)
+		if err != nil {
+			log.Panicln(err)
+		}
+		fromNode.SetStyle(cgraph.BoldNodeStyle)
+		for _, to := range tos {
+			toNode, err := graph.CreateNode(to)
+			if err != nil {
+				log.Panicln(err)
+			}
+			toNode.SetStyle(cgraph.BoldNodeStyle)
+			edge, err := graph.CreateEdge(from, fromNode, toNode)
+			if err != nil {
+				log.Panicln(err)
+			}
+			edge.SetURL("#" + from + "->" + to)
+			edge.SetStyle(cgraph.BoldEdgeStyle)
+		}
+	}
+	format := graphviz.Format(strings.Trim(filepath.Ext(*graphResultFile), "."))
+	err = g.RenderFilename(graph, format, *graphResultFile)
+	if err != nil {
+		log.Panicln(err)
+	}
+	fmt.Println("result saved to " + *graphResultFile)
 }
