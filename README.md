@@ -6,6 +6,14 @@ golang dependency search tool.
 
 ```
 go get -u github.com/ma6174/go_dep_search
+
+```
+
+or get with graphviz embed
+
+```
+go get -u -tags graphviz github.com/ma6174/go_dep_search
+
 ```
 
 ### Usage
