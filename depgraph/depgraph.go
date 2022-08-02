@@ -15,42 +15,67 @@ type DepInfo struct {
 	Imports    []string `json:"Imports"`    // import paths used by this package
 }
 
-func (d *DepInfo) ImportsMap() map[string]bool {
-	m := make(map[string]bool, len(d.Imports))
+func (d *DepInfo) ImportsMap() packages {
+	m := make(packages, len(d.Imports))
 	for _, v := range d.Imports {
-		m[v] = true
+		m.Add(v)
 	}
 	return m
 }
 
-func (d *DepInfo) DepsMap() map[string]bool {
-	m := make(map[string]bool, len(d.Deps))
+func (d *DepInfo) DepsMap() packages {
+	m := make(packages, len(d.Deps))
 	for _, v := range d.Deps {
-		m[v] = true
+		m.Add(v)
 	}
 	return m
+}
+
+type packages map[string]struct{}
+
+func (p packages) Contains(packageName string) bool {
+	_, ok := p[packageName]
+	return ok
+}
+
+func (p packages) Add(packageName string) {
+	p[packageName] = struct{}{}
+}
+
+func (p packages) ContainsDir(dirName string) (packageName string, contains bool) {
+	dirName = strings.TrimSuffix(dirName, "/")
+	if p.Contains(dirName) {
+		return dirName, true
+	}
+	dirName += "/"
+	for packageName := range p {
+		if strings.HasPrefix(packageName, dirName) {
+			return packageName, true
+		}
+	}
+	return "", false
 }
 
 type DepGraph struct {
-	imports      map[string]map[string]bool
-	allDeps      map[string]map[string]bool
-	mainPackages map[string]bool
-	testPackages map[string]bool
+	imports      map[string]packages
+	allDeps      map[string]packages
+	mainPackages packages
+	testPackages packages
 }
 
 func (g *DepGraph) Add(d DepInfo) {
 	if g.imports == nil {
-		g.imports = make(map[string]map[string]bool)
-		g.imports["main"] = make(map[string]bool)
+		g.imports = make(map[string]packages)
+		g.imports["main"] = make(packages)
 	}
 	if g.mainPackages == nil {
-		g.mainPackages = make(map[string]bool)
+		g.mainPackages = make(packages)
 	}
 	if g.testPackages == nil {
-		g.testPackages = make(map[string]bool)
+		g.testPackages = make(packages)
 	}
 	if g.allDeps == nil {
-		g.allDeps = make(map[string]map[string]bool)
+		g.allDeps = make(map[string]packages)
 	}
 	if strings.HasSuffix(d.ImportPath, "]") { // skip test package
 		return
@@ -58,9 +83,9 @@ func (g *DepGraph) Add(d DepInfo) {
 	isTestPackage := strings.HasSuffix(d.ImportPath, ".test")
 	if d.Name == "main" {
 		if isTestPackage {
-			g.testPackages[d.ImportPath] = true
+			g.testPackages.Add(d.ImportPath)
 		} else {
-			g.mainPackages[d.ImportPath] = true
+			g.mainPackages.Add(d.ImportPath)
 		}
 	}
 	g.imports[d.ImportPath] = d.ImportsMap()
@@ -70,6 +95,7 @@ func (g *DepGraph) Add(d DepInfo) {
 func (g *DepGraph) CountAll() int {
 	return len(g.imports)
 }
+
 func (g *DepGraph) CountMain() int {
 	return len(g.mainPackages)
 }
@@ -89,7 +115,7 @@ func reverseSlice(a []string) {
 
 func (g *DepGraph) SearchMain(packageName string) (packages []string) {
 	for v := range g.mainPackages {
-		if g.allDeps[v][packageName] || v == packageName {
+		if g.allDeps[v].Contains(packageName) || v == packageName {
 			packages = append(packages, v)
 		}
 	}
@@ -98,7 +124,7 @@ func (g *DepGraph) SearchMain(packageName string) (packages []string) {
 
 func (g *DepGraph) SearchTest(packageName string) (packages []string) {
 	for v := range g.testPackages {
-		if g.allDeps[v][packageName] {
+		if g.allDeps[v].Contains(packageName) {
 			packages = append(packages, v)
 		}
 	}
@@ -112,7 +138,7 @@ func (g *DepGraph) Exists(packageName string) bool {
 
 func (g *DepGraph) SearchAll(packageName string) (packages []string) {
 	for k, v := range g.allDeps {
-		if v[packageName] {
+		if v.Contains(packageName) {
 			packages = append(packages, k)
 		}
 	}
@@ -124,12 +150,12 @@ func (g *DepGraph) ListUnUsed() (packages []string) {
 		sort.Strings(packages)
 	}()
 	for p := range g.allDeps {
-		if g.mainPackages[p] || g.testPackages[p] {
+		if g.mainPackages.Contains(p) || g.testPackages.Contains(p) {
 			continue
 		}
 		found := false
 		for m := range g.allDeps {
-			if g.allDeps[m][p] {
+			if g.allDeps[m].Contains(p) {
 				found = true
 			}
 		}
@@ -141,11 +167,11 @@ func (g *DepGraph) ListUnUsed() (packages []string) {
 }
 
 func (g *DepGraph) IsMainPackage(packageName string) bool {
-	return g.mainPackages[packageName]
+	return g.mainPackages.Contains(packageName)
 }
 
 func (g *DepGraph) IsTestPackage(packageName string) bool {
-	return g.testPackages[packageName]
+	return g.testPackages.Contains(packageName)
 }
 
 func (g *DepGraph) SearchChain(packageName string) (chains [][]string) {
@@ -169,10 +195,10 @@ func (g *DepGraph) SearchChain(packageName string) (chains [][]string) {
 }
 
 func (g *DepGraph) search(start, packageName string, current []string) (after []string, found bool) {
-	if !g.allDeps[start][packageName] {
+	if !g.allDeps[start].Contains(packageName) {
 		return
 	}
-	if g.imports[start][packageName] {
+	if g.imports[start].Contains(packageName) {
 		found = true
 		after = append(current, packageName)
 		return
@@ -187,7 +213,7 @@ func (g *DepGraph) search(start, packageName string, current []string) (after []
 }
 
 func (g *DepGraph) SearchGraph(start, toSearch string) (result map[string][]string) {
-	if !g.allDeps[start][toSearch] {
+	if !g.allDeps[start].Contains(toSearch) {
 		return
 	}
 	result = make(map[string][]string)
@@ -202,7 +228,7 @@ func (g *DepGraph) SearchGraph(start, toSearch string) (result map[string][]stri
 				result[fromPackage] = append(result[fromPackage], p)
 				continue
 			}
-			if g.allDeps[p][toSearch] {
+			if g.allDeps[p].Contains(toSearch) {
 				if !checked[p] {
 					checked[p] = true
 					l.PushBack(p)

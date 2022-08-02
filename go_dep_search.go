@@ -24,6 +24,7 @@ var (
 	chain           = flag.Bool("chain", false, "show dep chain, eg: main->package_a->b->c->d")
 	unused          = flag.Bool("unused", false, "list unused packages")
 	graph           = flag.Bool("graph", false, "show dep graph: -graph <from_package> <to_package>")
+	dir             = flag.Bool("dir", false, "search dir prefix")
 	graphResultFile = flag.String("o", "/tmp/dep.svg", "used with -graph, result file path, supported type: svg,png,jpg,dot")
 )
 
